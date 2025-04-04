@@ -15,7 +15,7 @@ def encontrar_fila_encabezados(df_raw):
             return i
     return None
 
-def procesar_parametrizacion(file_bytes):
+def procesar_parametrizacion(file_bytes, engine="openpyxl"):
     """
     Lee un archivo Excel (en formato BytesIO), identifica la fila de encabezados,
     agrupa datos y genera un DataFrame final con columnas extra
@@ -27,7 +27,7 @@ def procesar_parametrizacion(file_bytes):
     """
 
     # 1) Leemos el Excel sin encabezados
-    df_raw = pd.read_excel(file_bytes, sheet_name=0, header=None)
+    df_raw = pd.read_excel(file_bytes, sheet_name=0, header=None, engine=engine)
 
     # 2) Buscamos la fila de encabezados
     fila_encabezados = encontrar_fila_encabezados(df_raw)
@@ -36,7 +36,7 @@ def procesar_parametrizacion(file_bytes):
 
     # 3) Reposicionamos el puntero para volver a leer
     file_bytes.seek(0)
-    df_original = pd.read_excel(file_bytes, sheet_name=0, header=fila_encabezados)
+    df_original = pd.read_excel(file_bytes, sheet_name=0, header=fila_encabezados, engine=engine)
 
     # 4) Detectamos los nombres de columnas clave
     def match_column(nombre, columnas):
@@ -61,6 +61,8 @@ def procesar_parametrizacion(file_bytes):
         .reset_index(name="NÚMERO DE PERSONAS")
         .sort_values(by=[col_centro, col_dep, col_puesto])
     )
+
+    print(df_agrupado)
 
     # 6) Añadimos advertencias y sugerencias
     advertencias = []

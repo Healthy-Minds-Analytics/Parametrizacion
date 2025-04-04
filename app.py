@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import pandas as pd
 from io import BytesIO
@@ -5,46 +6,74 @@ from io import BytesIO
 # Importamos la lógica desde paramDEF.py
 import paramDEF
 
-def main():
-    st.title("Organizador de puestos y sugerencia de unificaciones")
-    st.write("Sube un archivo Excel con las columnas requeridas...")
+def procesar_archivo(file_bytes, extension):
+    """
+    Lee el Excel en file_bytes usando el motor correcto según la extensión
+    ('.xls' -> 'xlrd', '.xlsx' -> 'openpyxl'), 
+    y luego llama a paramDEF.procesar_parametrizacion() para agrupar y crear la tabla final.
+    """
+    if extension.lower() == ".xls":
+        # Necesitas xlrd instalado
+        df_original, df_final = paramDEF.procesar_parametrizacion(file_bytes, engine="xlrd")
+    elif extension.lower() == ".xlsx":
+        # Para xlsx, usa openpyxl
+        df_original, df_final = paramDEF.procesar_parametrizacion(file_bytes, engine="openpyxl")
+    else:
+        raise ValueError("Formato de archivo no soportado. Usa .xls o .xlsx.")
+    
+    return df_original, df_final
 
-    # 1. Subida del archivo
-    archivo_subido = st.file_uploader("Selecciona el archivo Excel", type=["xlsx"])
+def main():
+# Configura la página (opcional)
+    st.set_page_config(layout="wide")
+
+    # Definimos dos columnas: la primera estrecha para el logo, la segunda ancha para el título
+    col1, col2 = st.columns([1, 5])  # Ajusta proporciones a tu gusto
+
+    with col1:
+        st.image("./Logo.png", use_container_width=True)
+
+    with col2:
+        st.write("")
+    st.title("Organizador de puestos y sugerencia de unificaciones")
+    st.write("Sube tu archivo Excel...")
+    archivo_subido = st.file_uploader("Selecciona el archivo Excel (.xls o .xlsx)", type=["xlsx", "xls"])
 
     if archivo_subido is not None:
         try:
-            # Convertimos el archivo subido en un objeto BytesIO
+            # 1) Leemos el archivo en bytes
             file_bytes = BytesIO(archivo_subido.read())
 
-            # 2. Llamamos a la función de paramDEF.py para procesar
-            #    (df_original no lo vamos a usar para la descarga, 
-            #     solo df_final, que es el de advertencias/sugerencias)
-            df_original, df_final = paramDEF.procesar_parametrizacion(file_bytes)
+            # 2) Detectamos la extensión
+            _, extension = os.path.splitext(archivo_subido.name)
 
-            st.subheader("Resumen de puestos (agrupado, con advertencias y sugerencias)")
+            # 3) Procesamos el archivo
+            df_original, df_final = procesar_archivo(file_bytes, extension)
 
-            # 3. Permitimos editar df_final en línea
-            df_editado = st.experimental_data_editor(df_final, num_rows="dynamic")
+            st.subheader("Resumen de puestos")
+
+            # Aquí mostramos la tabla SIN permitir edición, con scroll
+            # Ajusta 'height' y 'width' a tu gusto
+            st.dataframe(df_final, use_container_width=True, height=400)
 
             st.write("###")
 
-            # 4. Botón para descargar SOLO la tabla editada
-            st.subheader("Descarga de la tabla final editada")
+            # 4. Botón para descargar la tabla final
+            st.subheader("Descarga de la tabla final")
 
             def to_excel(df):
                 output = BytesIO()
                 with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                    # Solo creamos 1 hoja con la tabla editada
-                    df.to_excel(writer, sheet_name="Resumen Puestos Editado", index=False)
+                    # Solo creamos 1 hoja con la tabla
+                    df.to_excel(writer, sheet_name="Resumen Puestos", index=False)
                 return output.getvalue()
 
-            df_excel = to_excel(df_editado)
+            df_excel = to_excel(df_final)
 
             st.download_button(
-                label="📥 Descargar tabla editada",
+                label="📥 Descargar tabla final",
                 data=df_excel,
-                file_name="puestos_editados.xlsx",
+                file_name="puestos_procesados.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
